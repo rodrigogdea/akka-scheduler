@@ -2,6 +2,7 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, Props}
 import akka.actor.Actor.Receive
+import akka.routing.{BroadcastRoutingLogic, Router}
 import akka.testkit.{ImplicitSender, TestActors, TestKit}
 import org.scalatest.WordSpecLike
 import org.scalatest.Matchers
@@ -37,17 +38,20 @@ class AkkaSchedulerSpec extends TestKit(ActorSystem("AkkaSchedulerSpec")) with I
 
 class SchedulerActor extends Actor {
 
-  override def receive: Receive = {
-    case Tick(tick) => context.actorSelection("akka://SchedulerSystem/*/Scheduler/**") ! new Date(tick).toString
+  private var router: Router = Router(BroadcastRoutingLogic())
 
-    case name: String => context.actorOf(Props[JobRunnerActor], name)
+
+  override def receive: Receive = {
+    case Tick(tick) => router.route(new Date(tick).toString, self)
+
+    case name: String => router = router.addRoutee(context.actorOf(Props(new JobRunnerActor(name))))
   }
 }
 
-class JobRunnerActor extends Actor {
+class JobRunnerActor(name: String) extends Actor {
 
   override def receive: Receive = {
-    case tick: String => println(tick)
+    case tick: String => println(s"$name: $tick")
   }
 }
 
