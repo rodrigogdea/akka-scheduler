@@ -19,7 +19,7 @@ class CronExpressionSpec extends FlatSpec with Matchers {
     CronExpression("* * * 23 * * *").at(new DateTime(2016, 11, 23, 12, 3, 13, 123)) should be(true)
   }
 
-  it should "'* * * * 2 * *' match at 2nd day of the week" in {
+  it should "'* * * * 2 * *' match on Tuesday" in {
     CronExpression("* * * * 2 * *").at(new DateTime(2016, 11, 1, 12, 3, 13, 123)) should be(true)
   }
 
