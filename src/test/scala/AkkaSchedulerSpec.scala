@@ -20,11 +20,11 @@ class AkkaSchedulerSpec extends TestKit(ActorSystem("AkkaSchedulerSpec")) with I
     "send back messages unchanged" in {
 
       Scheduler.addJob(CronExpression("* * * 1 * * *"), Job("Un job uno", new Runnable {
-        override def run(): Unit = println("Heavy job one")
+        def run(): Unit = println("Heavy job one")
       }))
 
       Scheduler.addJob(CronExpression("* * * * 9 * *"), Job("Un job dos", new Runnable {
-        override def run(): Unit = println("Heavy job two")
+        def run(): Unit = println("Heavy job two")
       }))
 
 
