@@ -43,6 +43,36 @@ class CronExpressionSpec extends FlatSpec with Matchers {
     CronExpression("* 13,14,15 * * * * *").at(new DateTime(2016, 11, 12, 12, 14, 2, 123)) should be(true)
   }
 
+  it should "'* 13-15 * * * * *' match at 14th minute of the hour in range" in {
+    CronExpression("* 13-15 * * * * *").at(new DateTime(2016, 11, 12, 12, 14, 2, 123)) should be(true)
+  }
+
+  it should "'10-30/2 13-15 * * * * *' match at 20th second of minute" in {
+    CronExpression("10-30/2 13-15 * * * * *").at(new DateTime(2016, 11, 12, 12, 14, 20, 123)) should be(true)
+  }
+
+  it should "'10-30/2 13-15 * * * * *' not match at 34th second of minute" in {
+    CronExpression("10-30/2 13-15 * * * * *").at(new DateTime(2016, 11, 12, 12, 14, 34, 123)) should be(false)
+  }
+
+  val expression: CronExpression = CronExpression("0 0 3 * * * *")
+
+  it should "'10-30/2 13-15 * * * * *' test time 1" in {
+    expression.at(new DateTime(2016, 11, 12, 12, 14, 34, 123)) should be(false)
+  }
+
+  it should "'10-30/2 13-15 * * * * *' test time 2" in {
+    expression.at(new DateTime(2016, 2, 3, 12, 14, 34, 123)) should be(false)
+  }
+
+  it should "'10-30/2 13-15 * * * * *' test time 3" in {
+    expression.at(new DateTime(2016, 4, 2, 12, 14, 34, 123)) should be(false)
+  }
+
+  it should "'10-30/2 13-15 * * * * *' test time 4" in {
+    expression.at(new DateTime(2016, 1, 2, 12, 14, 34, 123)) should be(false)
+  }
+
   it should "throw Exception if try to build '* X * * * * 2016'" in {
     a[Exception] should be thrownBy {
       CronExpression("* X * * * * 2016")

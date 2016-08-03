@@ -2,6 +2,7 @@ import org.joda.time.DateTime
 
 
 /**
+  * <pre>
   * Pattern: "SM MH HD DM DW MY YY"
   * SM: Second of minute
   * MH: Minute of the hour
@@ -24,8 +25,7 @@ import org.joda.time.DateTime
   * "0 * * * * * *" -> Each 0 second of every minute
   * "* 0 * * * * *" -> Every second at minute 0 of every hour
   *
-  *
-  *
+  * </pre>
   * @param expression The string expression of the Cron
   */
 case class CronExpression(expression: String) {
@@ -37,41 +37,43 @@ case class CronExpression(expression: String) {
   private def parse(expression: String): Function[DateTime, Boolean] = {
     val intToString: Map[Int, String] = expression.trim.split(" ").zipWithIndex.map(_.swap).toMap
     List[Function[DateTime, Boolean]](
-      SecondsMatcher(toCronItem(intToString(0))),
-      MinutesMatcher(toCronItem(intToString(1))),
-      HoursMatcher(toCronItem(intToString(2))),
-      DaysMatcher(toCronItem(intToString(3))),
-      DayOfWeekMatcher(toCronItem(intToString(4))),
-      MonthMatcher(toCronItem(intToString(5))),
-      YearMatcher(toCronItem(intToString(6)))
+      SecondsMatcher(toCronItem(intToString(0), 59)),
+      MinutesMatcher(toCronItem(intToString(1), 59)),
+      HoursMatcher(toCronItem(intToString(2), 23)),
+      DaysMatcher(toCronItem(intToString(3), 31)),
+      DayOfWeekMatcher(toCronItem(intToString(4), 7)),
+      MonthMatcher(toCronItem(intToString(5), 12)),
+      YearMatcher(toCronItem(intToString(6), 0))
     )
       .reduce((mL, mR) => dt => mL(dt) && mR(dt))
   }
 
-  private def toCronItem(cronItemExp: String): CronItem = {
-    if (cronItemExp == "*") CronItem(List())
+  private def toCronItem(cronItemExp: String, maxValue: Int): CronItem = {
+    if (cronItemExp == "*")
+      CronItem(List())
     else if (cronItemExp.matches("\\d+/\\d+")) {
       val startStep = cronItemExp.split("/").map(_.toInt)
-      CronItem(List(startStep.head), Some(startStep.tail.head))
+      CronItem(Range(startStep(0), maxValue + 1, startStep(1)).toList)
     }
     else if (cronItemExp.matches("\\d+(,\\d+)*")) {
       CronItem(cronItemExp.split(",").map(_.toInt).toList)
+    }
+    else if (cronItemExp.matches("\\d+-\\d+(/\\d+)?")) {
+      val itemParts = cronItemExp.split("/").toList
+      val range = itemParts.head.split("-").map(_.toInt)
+      CronItem(Range(range(0), range(1) + 1, itemParts.tail.headOption.map(_.toInt).getOrElse(1)).toList)
     }
     else
       throw new Exception(s"Expression $cronItemExp not allowed.")
   }
 }
 
-case class CronItem(start: List[Int], step: Option[Int] = None, range: Option[Range] = None)
+case class CronItem(start: List[Int])
 
 trait CronItemMatcher extends Function[DateTime, Boolean] {
   def item: CronItem
 
-  protected def eval(instant: Int): Boolean = {
-    item.start.isEmpty ||
-      item.start.contains(instant) ||
-      item.step.exists(item.start.forall(_ <= instant) && instant % _ == 0)
-  }
+  protected def eval(instant: Int): Boolean = item.start.isEmpty || item.start.contains(instant)
 }
 
 case class SecondsMatcher(item: CronItem) extends CronItemMatcher {
