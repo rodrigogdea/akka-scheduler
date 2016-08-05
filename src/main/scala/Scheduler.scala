@@ -7,10 +7,13 @@ import org.joda.time.DateTime
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
 
+trait SchedulerExecutionContext {
+  import scala.concurrent.ExecutionContext
+  implicit val ec = ExecutionContext.fromExecutor(null)
+}
 
-object Scheduler {
+object Scheduler extends SchedulerExecutionContext {
   val tickInterval: Int = 500
 
   private lazy val system: ActorSystem = ActorSystem("SchedulerSystem")
@@ -48,7 +51,7 @@ class SchedulerActor extends Actor {
   }
 }
 
-class TriggerJobRunnerActor(cronExpression: CronExpression, job: Job) extends Actor {
+class TriggerJobRunnerActor(cronExpression: CronExpression, job: Job) extends Actor with SchedulerExecutionContext {
 
   val jobRunner: ActorRef = context.actorOf(Props[JobRunnerActor])
 

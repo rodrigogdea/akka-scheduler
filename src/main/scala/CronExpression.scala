@@ -26,6 +26,7 @@ import org.joda.time.DateTime
   * "* 0 * * * * *" -> Every second at minute 0 of every hour
   *
   * </pre>
+  *
   * @param expression The string expression of the Cron
   */
 case class CronExpression(expression: String) {
@@ -52,16 +53,22 @@ case class CronExpression(expression: String) {
     if (cronItemExp == "*")
       CronItem(List())
     else if (cronItemExp.matches("\\d+/\\d+")) {
-      val startStep = cronItemExp.split("/").map(_.toInt)
-      CronItem(Range(startStep(0), maxValue + 1, startStep(1)).toList)
+      cronItemExp.split("/").map(_.toInt) match {
+        case Array(min, step) => CronItem(Range(min, maxValue + 1, step).toList)
+      }
     }
     else if (cronItemExp.matches("\\d+(,\\d+)*")) {
       CronItem(cronItemExp.split(",").map(_.toInt).toList)
     }
     else if (cronItemExp.matches("\\d+-\\d+(/\\d+)?")) {
-      val itemParts = cronItemExp.split("/").toList
-      val range = itemParts.head.split("-").map(_.toInt)
-      CronItem(Range(range(0), range(1) + 1, itemParts.tail.headOption.map(_.toInt).getOrElse(1)).toList)
+      cronItemExp.split("/") match {
+        case Array(rangeSpec) => rangeSpec.split("-").map(_.toInt) match {
+          case Array(min, max) => CronItem(Range(min, max + 1).toList)
+        }
+        case Array(rangeSpec, step) => rangeSpec.split("-").map(_.toInt) match {
+          case Array(min, max) => CronItem(Range(min, max + 1, step.toInt).toList)
+        }
+      }
     }
     else
       throw new Exception(s"Expression $cronItemExp not allowed.")
@@ -75,6 +82,8 @@ trait CronItemMatcher extends Function[DateTime, Boolean] {
 
   protected def eval(instant: Int): Boolean = item.start.isEmpty || item.start.contains(instant)
 }
+
+//TODO: Validate all CronItem Domains
 
 case class SecondsMatcher(item: CronItem) extends CronItemMatcher {
   def apply(dateTime: DateTime) = eval(dateTime.getSecondOfMinute)
