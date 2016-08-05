@@ -1,6 +1,6 @@
 # Akka-scheduler
 
-A simple scheduler bases on Akka.
+A simple scheduler based on Akka.
 
 # Using scheduler
 
