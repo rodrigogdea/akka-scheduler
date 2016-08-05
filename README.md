@@ -30,7 +30,7 @@ YY: Year
 "*": Match any value of a given instance
 "\d+(,\d+)*": Match one value or a list of values
 "\d+/\d+": Match a starting value and a step
-"\d+-\d+": Match a range
+"\d+-\d+(/\d+)": Match a range and optionaly a step inside the range
 
  Possible values depends on the domain of the particular cron item (eg: to Seconds will be 0-59)
 </pre>
