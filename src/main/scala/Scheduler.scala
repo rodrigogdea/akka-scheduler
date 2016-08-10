@@ -9,23 +9,32 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 
 trait SchedulerExecutionContext {
-  import scala.concurrent.ExecutionContext
-  implicit val ec = ExecutionContext.fromExecutor(null)
+
+  object ThreadPoolContext{
+    import scala.concurrent.ExecutionContext
+    implicit val ec = ExecutionContext.fromExecutor(null)
+  }
+
 }
 
 object Scheduler extends SchedulerExecutionContext {
+
+  import ThreadPoolContext._
+
   val tickInterval: Int = 500
 
   private lazy val system: ActorSystem = ActorSystem("SchedulerSystem")
 
   private lazy val schedulerActor: ActorRef = system.actorOf(Props[SchedulerActor], "Scheduler")
-  private val cancellable: Cancellable = system.scheduler.schedule(tickInterval milliseconds, tickInterval milliseconds)(
+  private lazy val cancellable: Cancellable = system.scheduler.schedule(tickInterval milliseconds, tickInterval milliseconds)(
     schedulerActor ! Tick(System.currentTimeMillis())
   )
 
   def addJob(cronExpression: CronExpression, job: Job) = schedulerActor ! (cronExpression -> job)
 
   def removeJob(jobName: String) = schedulerActor ! ("remove" -> jobName)
+
+  def start():Unit = cancellable
 
 }
 
@@ -52,6 +61,8 @@ class SchedulerActor extends Actor {
 }
 
 class TriggerJobRunnerActor(cronExpression: CronExpression, job: Job) extends Actor with SchedulerExecutionContext {
+
+  import ThreadPoolContext._
 
   val jobRunner: ActorRef = context.actorOf(Props[JobRunnerActor])
 

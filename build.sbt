@@ -10,5 +10,6 @@ libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.9.4",
 
   "com.typesafe.akka" %% "akka-testkit" % "2.4.8" % "test",
-  "org.scalatest" %% "scalatest" % "2.2.6" % "test"
+  "org.scalatest" %% "scalatest" % "2.2.6" % "test",
+  "junit" % "junit" % "4.12" % "test"
 )

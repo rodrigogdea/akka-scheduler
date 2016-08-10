@@ -4,12 +4,23 @@ A simple scheduler based on Akka.
 
 # Using scheduler
 
+### From Scala
 ```scala
-  val expression = CronExpression("0 0 2-3 * * * *")
-
-  Scheduler.addJob(expression, Job("Run every day at 2 and 3 AM", new Runnable {
+    val expression = CronExpression("0 0 2-3 * * * *")
+    
+    Scheduler.addJob(expression, Job("Run every day at 2 and 3 AM", new Runnable {
     def run(): Unit = println("Heavy job one")
-  }))
+    }))
+    
+    Scheduler.start()
+```
+### From Java
+```java
+    CronExpression cronExpression = new CronExpression("* * * * * * *");
+    
+    Scheduler.addJob(cronExpression, new Job("A Job!", () -> System.out.println("run....")));
+    
+    Scheduler.start();
 ```
 
 # Cron Expression

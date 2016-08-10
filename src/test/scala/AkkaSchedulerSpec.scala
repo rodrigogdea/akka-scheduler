@@ -1,12 +1,6 @@
-import java.util.Date
-
-import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, Props}
-import akka.actor.Actor.Receive
-import akka.routing.{BroadcastRoutingLogic, Router}
+import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActors, TestKit}
-import org.scalatest.WordSpecLike
-import org.scalatest.Matchers
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 class AkkaSchedulerSpec extends TestKit(ActorSystem("AkkaSchedulerSpec")) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
@@ -26,6 +20,8 @@ class AkkaSchedulerSpec extends TestKit(ActorSystem("AkkaSchedulerSpec")) with I
       Scheduler.addJob(CronExpression("* * * * 9 * *"), Job("Un job dos", new Runnable {
         def run(): Unit = println("Heavy job two")
       }))
+
+      Scheduler.start()
 
       Thread.sleep(10000)
 
