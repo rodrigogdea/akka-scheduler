@@ -6,10 +6,13 @@ A simple scheduler based on Akka.
 
 ### From Scala
 ```scala
+
+    val stack = mutable.Stack[String]()
+
     val expression = CronExpression("0 0 2-3 * * * *")
     
-    SimpleScheduler.scheduleJob(expression, Job("Run every day at 2 and 3 AM", new Runnable {
-    def run(): Unit = println("Heavy job one")
+    SimpleScheduler.scheduleJob(expression, Job("Add to stack", Runnable {
+      stack.push("Hi")
     }))
     
     SimpleScheduler.start()
