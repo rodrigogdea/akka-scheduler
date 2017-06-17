@@ -10,12 +10,13 @@ A simple scheduler based on Akka.
     val stack = mutable.Stack[String]()
 
     val expression = CronExpression("0 0 2-3 * * * *")
+
+    SimpleScheduler.start()
     
     SimpleScheduler.scheduleJob(expression, Job("Add to stack", Runnable {
       stack.push("Hi")
     }))
     
-    SimpleScheduler.start()
 ```
 ### From Java
 ```java
