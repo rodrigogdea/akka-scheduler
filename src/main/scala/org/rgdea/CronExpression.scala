@@ -1,3 +1,5 @@
+package org.rgdea
+
 import org.joda.time.DateTime
 
 
@@ -33,7 +35,7 @@ case class CronExpression(expression: String) {
 
   private val matcher = parse(expression)
 
-  def at(dateTime: DateTime) = matcher(dateTime)
+  def at(dateTime: DateTime): Boolean = matcher(dateTime)
 
   private def parse(expression: String): Function[DateTime, Boolean] = {
     val intToString: Map[Int, String] = expression.trim.split(" ").zipWithIndex.map(_.swap).toMap
