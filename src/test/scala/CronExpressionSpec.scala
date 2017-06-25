@@ -79,6 +79,13 @@ class CronExpressionSpec extends FlatSpec with Matchers {
       CronExpression("* X * * * * 2016")
     }
   }
+
+  it should "Convert a DateTime to CronExpression" in {
+    val dateTime = new DateTime(2001, 3, 21, 14, 25, 56)
+    val expression1 = CronExpression.fromDateTime(dateTime)
+    expression1.expression should be("56 25 14 21 * 3 2001")
+    expression1.at(dateTime) should be(true)
+  }
 }
 
 

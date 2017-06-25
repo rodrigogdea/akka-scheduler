@@ -2,6 +2,20 @@ package org.rgdea
 
 import org.joda.time.DateTime
 
+object CronExpression {
+
+  def fromDateTime(dateTime: DateTime): CronExpression = {
+    val sm = dateTime.getSecondOfMinute.toString
+    val mh = dateTime.getMinuteOfHour.toString
+    val hd = dateTime.getHourOfDay.toString
+    val dm = dateTime.getDayOfMonth.toString
+    val my = dateTime.getMonthOfYear.toString
+    val yy = dateTime.getYear.toString
+    CronExpression(s"$sm $mh $hd $dm * $my $yy")
+  }
+
+
+}
 
 /**
   * <pre>
@@ -40,35 +54,37 @@ case class CronExpression(expression: String) {
   private def parse(expression: String): Function[DateTime, Boolean] = {
     val intToString: Map[Int, String] = expression.trim.split(" ").zipWithIndex.map(_.swap).toMap
     List[Function[DateTime, Boolean]](
-      SecondsMatcher(toCronItem(intToString(0), 59)),
-      MinutesMatcher(toCronItem(intToString(1), 59)),
-      HoursMatcher(toCronItem(intToString(2), 23)),
-      DaysMatcher(toCronItem(intToString(3), 31)),
-      DayOfWeekMatcher(toCronItem(intToString(4), 7)),
-      MonthMatcher(toCronItem(intToString(5), 12)),
-      YearMatcher(toCronItem(intToString(6), 0))
+      CronItem(toCronValues(intToString(0), 0, 59), dt => dt.getSecondOfMinute),
+      CronItem(toCronValues(intToString(1), 0, 59), dt => dt.getMinuteOfHour),
+      CronItem(toCronValues(intToString(2), 0, 23), dt => dt.getHourOfDay),
+      CronItem(toCronValues(intToString(3), 1, 31), dt => dt.getDayOfMonth),
+      CronItem(toCronValues(intToString(4), 1, 7), dt => dt.getDayOfWeek),
+      CronItem(toCronValues(intToString(5), 1, 12), dt => dt.getMonthOfYear),
+      CronItem(toCronValues(intToString(6), 1), dt => dt.getYear)
     )
       .reduce((mL, mR) => dt => mL(dt) && mR(dt))
   }
 
-  private def toCronItem(cronItemExp: String, maxValue: Int): CronItem = {
+  private def toCronValues(cronItemExp: String,
+                           minValue: Int,
+                           maxValue: Int = Int.MaxValue): CronValues = {
     if (cronItemExp == "*")
-      CronItem(List())
+      RangeCronValues(Range.inclusive(minValue, maxValue))
     else if (cronItemExp.matches("\\d+/\\d+")) {
       cronItemExp.split("/").map(_.toInt) match {
-        case Array(min, step) => CronItem(Range(min, maxValue + 1, step).toList)
+        case Array(min, step) => RangeCronValues(Range.inclusive(min, maxValue, step))
       }
     }
     else if (cronItemExp.matches("\\d+(,\\d+)*")) {
-      CronItem(cronItemExp.split(",").map(_.toInt).toList)
+      ListCronValues(cronItemExp.split(",").map(_.toInt).toList)
     }
     else if (cronItemExp.matches("\\d+-\\d+(/\\d+)?")) {
       cronItemExp.split("/") match {
         case Array(rangeSpec) => rangeSpec.split("-").map(_.toInt) match {
-          case Array(min, max) => CronItem(Range(min, max + 1).toList)
+          case Array(min, max) => RangeCronValues(Range.inclusive(min, max))
         }
         case Array(rangeSpec, step) => rangeSpec.split("-").map(_.toInt) match {
-          case Array(min, max) => CronItem(Range(min, max + 1, step.toInt).toList)
+          case Array(min, max) => RangeCronValues(Range.inclusive(min, max, step.toInt))
         }
       }
     }
@@ -77,40 +93,20 @@ case class CronExpression(expression: String) {
   }
 }
 
-case class CronItem(start: List[Int])
 
-trait CronItemMatcher extends Function[DateTime, Boolean] {
-  def item: CronItem
-
-  protected def eval(instant: Int): Boolean = item.start.isEmpty || item.start.contains(instant)
+case class CronItem(cronValues: CronValues, instant: DateTime => Int)
+  extends Function[DateTime, Boolean] {
+  def apply(v1: DateTime): Boolean = cronValues.contains(instant(v1))
 }
 
-//TODO: Validate all CronItem Domains
-
-case class SecondsMatcher(item: CronItem) extends CronItemMatcher {
-  def apply(dateTime: DateTime) = eval(dateTime.getSecondOfMinute)
+trait CronValues {
+  def contains(instant: Int): Boolean
 }
 
-case class MinutesMatcher(item: CronItem) extends CronItemMatcher {
-  def apply(dateTime: DateTime) = eval(dateTime.getMinuteOfHour)
+case class RangeCronValues(range: Range) extends CronValues {
+  def contains(instant: Int): Boolean = range.contains(instant)
 }
 
-case class HoursMatcher(item: CronItem) extends CronItemMatcher {
-  def apply(dateTime: DateTime) = eval(dateTime.getHourOfDay)
-}
-
-case class DaysMatcher(item: CronItem) extends CronItemMatcher {
-  def apply(dateTime: DateTime) = eval(dateTime.getDayOfMonth)
-}
-
-case class DayOfWeekMatcher(item: CronItem) extends CronItemMatcher {
-  def apply(dateTime: DateTime) = eval(dateTime.getDayOfWeek)
-}
-
-case class MonthMatcher(item: CronItem) extends CronItemMatcher {
-  def apply(dateTime: DateTime) = eval(dateTime.getMonthOfYear)
-}
-
-case class YearMatcher(item: CronItem) extends CronItemMatcher {
-  def apply(dateTime: DateTime) = eval(dateTime.getYear)
+case class ListCronValues(list: List[Int]) extends CronValues {
+  def contains(instant: Int): Boolean = list.contains(instant)
 }
