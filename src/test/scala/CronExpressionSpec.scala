@@ -86,6 +86,26 @@ class CronExpressionSpec extends FlatSpec with Matchers {
     expression1.expression should be("56 25 14 21 * 3 2001")
     expression1.at(dateTime) should be(true)
   }
+
+  it should "Create CronExpression every one hour from dateTome" in {
+    val dateTime = new DateTime(2001, 3, 21, 14, 25, 56)
+    val expression1 = CronExpression.everyHourFrom(dateTime)
+    expression1.expression should be("* 25 * * * * *")
+    expression1.at(new DateTime(2001, 3, 21, 15, 25, 2)) should be(true)
+    expression1.at(new DateTime(2001, 3, 21, 16, 25, 21)) should be(true)
+    expression1.at(new DateTime(2001, 3, 21, 16, 26, 3)) should be(false)
+  }
+
+  it should "Create CronExpression every stepped hour from dateTome" in {
+    val dateTime = new DateTime(2001, 3, 21, 14, 25, 56)
+    val expression1 = CronExpression.everySteppedHourFrom(dateTime, 12)
+    expression1.expression should be("* 25 14/12 * * * *")
+    expression1.at(new DateTime(2001, 3, 21, 14, 25, 2)) should be(true)
+    expression1.at(new DateTime(2001, 3, 22, 2, 25, 21)) should be(true)
+    expression1.at(new DateTime(2001, 3, 22, 14, 26, 3)) should be(false)
+  }
+
+
 }
 
 

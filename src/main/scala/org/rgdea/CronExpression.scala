@@ -5,16 +5,38 @@ import org.joda.time.DateTime
 object CronExpression {
 
   def fromDateTime(dateTime: DateTime): CronExpression = {
-    val sm = dateTime.getSecondOfMinute.toString
-    val mh = dateTime.getMinuteOfHour.toString
-    val hd = dateTime.getHourOfDay.toString
-    val dm = dateTime.getDayOfMonth.toString
-    val my = dateTime.getMonthOfYear.toString
-    val yy = dateTime.getYear.toString
+    val (sm, mh, hd, dm, my, yy) = dateTimeValues(dateTime)
     CronExpression(s"$sm $mh $hd $dm * $my $yy")
   }
 
+  def everyHourFrom(dateTime: DateTime): CronExpression = {
+    val (_, mh, _, _, _, _) = dateTimeValues(dateTime)
+    CronExpression(s"* $mh * * * * *")
+  }
 
+  def everySteppedHourFrom(dateTime: DateTime, step: Int): CronExpression = {
+    val (_, mh, hd, _, _, _) = dateTimeValues(dateTime)
+    CronExpression(s"* $mh $hd/$step * * * *")
+  }
+
+  def everyDayFrom(dateTime: DateTime): CronExpression = {
+    val (_, mh, hd, _, _, _) = dateTimeValues(dateTime)
+    CronExpression(s"* $mh $hd * * * *")
+  }
+
+
+  def dateTimeValues(dateTime: DateTime): (String, String, String, String, String, String) = (
+    dateTime.getSecondOfMinute.toString,
+    dateTime.getMinuteOfHour.toString,
+    dateTime.getHourOfDay.toString,
+    dateTime.getDayOfMonth.toString,
+    dateTime.getMonthOfYear.toString,
+    dateTime.getYear.toString
+  )
+
+  private[CronExpression] val startWithStep = "(\\d+)/(\\d+)".r
+  private[CronExpression] val listOfValues = "(\\d+)((,\\d+)*)".r
+  private[CronExpression] val rangeWithStep = "(\\d+)-(\\d+)(/(\\d+))?".r
 }
 
 /**
@@ -47,6 +69,8 @@ object CronExpression {
   */
 case class CronExpression(expression: String) {
 
+  import CronExpression._
+
   private val matcher = parse(expression)
 
   def at(dateTime: DateTime): Boolean = matcher(dateTime)
@@ -68,45 +92,36 @@ case class CronExpression(expression: String) {
   private def toCronValues(cronItemExp: String,
                            minValue: Int,
                            maxValue: Int = Int.MaxValue): CronValues = {
-    if (cronItemExp == "*")
-      RangeCronValues(Range.inclusive(minValue, maxValue))
-    else if (cronItemExp.matches("\\d+/\\d+")) {
-      cronItemExp.split("/").map(_.toInt) match {
-        case Array(min, step) => RangeCronValues(Range.inclusive(min, maxValue, step))
-      }
+    cronItemExp match {
+      case "*" => RangeCronValues(Range.inclusive(minValue, maxValue))
+      case startWithStep(start, step) =>
+        ListCronValues(Range.inclusive(start.toInt, start.toInt + maxValue, step.toInt)
+          .toList.map(_ % (maxValue +1)))
+      case listOfValues(first, "", _) => ListCronValues(List(first.toInt))
+      case listOfValues(first, more, _) => ListCronValues((first + more).split(",").map(_.toInt).toList)
+      case rangeWithStep(min, max, null, null) => RangeCronValues(Range.inclusive(min.toInt, max.toInt))
+      case rangeWithStep(min, max, _, step) => RangeCronValues(Range.inclusive(min.toInt, max.toInt, step.toInt))
+      case _ => throw new Exception(s"Expression $cronItemExp not allowed.")
     }
-    else if (cronItemExp.matches("\\d+(,\\d+)*")) {
-      ListCronValues(cronItemExp.split(",").map(_.toInt).toList)
-    }
-    else if (cronItemExp.matches("\\d+-\\d+(/\\d+)?")) {
-      cronItemExp.split("/") match {
-        case Array(rangeSpec) => rangeSpec.split("-").map(_.toInt) match {
-          case Array(min, max) => RangeCronValues(Range.inclusive(min, max))
-        }
-        case Array(rangeSpec, step) => rangeSpec.split("-").map(_.toInt) match {
-          case Array(min, max) => RangeCronValues(Range.inclusive(min, max, step.toInt))
-        }
-      }
-    }
-    else
-      throw new Exception(s"Expression $cronItemExp not allowed.")
   }
+
+  case class CronItem(cronValues: CronValues, instant: DateTime => Int)
+    extends Function[DateTime, Boolean] {
+    def apply(v1: DateTime): Boolean = cronValues.contains(instant(v1))
+  }
+
+  trait CronValues {
+    def contains(instant: Int): Boolean
+  }
+
+  case class RangeCronValues(range: Range) extends CronValues {
+    def contains(instant: Int): Boolean = range.contains(instant)
+  }
+
+  case class ListCronValues(list: List[Int]) extends CronValues {
+    def contains(instant: Int): Boolean = list.contains(instant)
+  }
+
 }
 
 
-case class CronItem(cronValues: CronValues, instant: DateTime => Int)
-  extends Function[DateTime, Boolean] {
-  def apply(v1: DateTime): Boolean = cronValues.contains(instant(v1))
-}
-
-trait CronValues {
-  def contains(instant: Int): Boolean
-}
-
-case class RangeCronValues(range: Range) extends CronValues {
-  def contains(instant: Int): Boolean = range.contains(instant)
-}
-
-case class ListCronValues(list: List[Int]) extends CronValues {
-  def contains(instant: Int): Boolean = list.contains(instant)
-}
