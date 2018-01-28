@@ -8,10 +8,12 @@ scalaVersion := "2.11.11"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.5.9",
-//  "org.scalax" %% "scala-boolean-extension" % "1.0",
+  "com.typesafe.akka" %% "akka-stream" % "2.5.9",
   "joda-time" % "joda-time" % "2.9.9",
+  "ch.qos.logback" % "logback-classic" % "1.2.3",
 
-  "com.typesafe.akka" %% "akka-testkit" % "2.5.9" % "test",
-  "org.scalatest" %% "scalatest" % "2.2.6" % "test",
-  "junit" % "junit" % "4.12" % "test"
+  "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.9" % Test,
+  "com.typesafe.akka" %% "akka-testkit" % "2.5.9" % Test,
+  "org.scalatest" %% "scalatest" % "2.2.6" % Test,
+  "junit" % "junit" % "4.12" % Test
 )

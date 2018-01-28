@@ -1,35 +1,21 @@
 package org.rgdea
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, Props, Scheduler}
-import akka.event.{DiagnosticLoggingAdapter, Logging}
-import akka.routing.{BroadcastRoutingLogic, Router}
+import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, Props}
+import akka.event.Logging
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.{ActorMaterializer, Materializer}
 import org.joda.time.DateTime
-import org.rgdea.SimpleScheduler.tickInterval
+import org.rgdea.SimpleScheduler.{ScheduleJob, Start, Stop, Tick, UnscheduleJob}
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
-trait SimpleSchedulerExecutionContext {
+object SimpleScheduler {
 
-  object ThreadPoolContext {
+  private implicit lazy val system: ActorSystem = ActorSystem("SimpleSchedulerSystem")
+  private implicit lazy val materializer: Materializer = ActorMaterializer()
 
-    import scala.concurrent.ExecutionContext
-
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(null)
-  }
-
-}
-
-object SimpleScheduler  {
-
-  val tickInterval: Int = 500
-
-  private lazy val system: ActorSystem = ActorSystem("SimpleSchedulerSystem")
-
-  private lazy val schedulerActor: ActorRef = system.actorOf(Props(
-    new SchedulerActor() with SimpleSchedulerExecutionContext
-  ), "SimpleScheduler")
+  private lazy val schedulerActor: ActorRef = system.actorOf(Props(new SimpleScheduler()), "SimpleScheduler")
 
   def scheduleJob(cronExpression: CronExpression, job: Job): Unit = schedulerActor ! ScheduleJob(job, cronExpression)
 
@@ -39,15 +25,29 @@ object SimpleScheduler  {
 
   def stop(): Unit = schedulerActor ! Stop
 
+  case class Tick(tick: DateTime)
+
+  class Job(val name: String, task: => Unit) {
+    def execute(): Unit = task
+  }
+
+  case class ScheduleJob(job: Job, cronExpression: CronExpression)
+
+  case class UnscheduleJob(jobName: String)
+
+  case object Start
+
+  case object Stop
+
 }
 
-class SchedulerActor extends Actor {
-  this: SimpleSchedulerExecutionContext =>
+class SimpleScheduler(implicit materializer: Materializer) extends Actor {
 
-  import ThreadPoolContext._
+  import context.dispatcher
 
-  private var router: Router = Router(BroadcastRoutingLogic())
-  private val jobRunners: mutable.Map[String, ActorRef] = mutable.Map()
+  val logger = Logging(context.system, this)
+
+  private val jobs = collection.mutable.Map[String, ScheduleJob]()
 
   private var tickCancellable: Cancellable = new Cancellable {
     def cancel(): Boolean = true
@@ -58,82 +58,33 @@ class SchedulerActor extends Actor {
   override def receive: Receive = {
 
     case Start =>
+
       if (tickCancellable.isCancelled) {
-        tickCancellable = context.system.scheduler.schedule(tickInterval milliseconds, tickInterval milliseconds)(
-          self ! Tick(System.currentTimeMillis())
+        tickCancellable = context.system.scheduler.schedule(1 second, 1 second)(
+          self ! Tick(DateTime.now())
         )
       }
 
     case Stop => tickCancellable.cancel()
 
     case Tick(tick) =>
-      router.route(new DateTime(tick), self)
+      if (jobs.nonEmpty) {
+        Source
+          .fromIterator(() => jobs.valuesIterator)
+          .filter(_.cronExpression.at(tick))
+          .mapAsync(jobs.size)(job =>
+            Future(job.job.execute())
+              .recover {
+                case e: Exception => logger.error(e, s"In Job: ${job.job.name}")
+              }
+          )
+          .runWith(Sink.ignore)
+      }
 
-    case ScheduleJob(job, cronExp) =>
-      val actorRef: ActorRef = context.actorOf(Props(new TriggerJobRunnerActor(cronExp, job)))
-      router = router.addRoutee(actorRef)
-      jobRunners(job.name) = actorRef
+    case jobToSchedule: ScheduleJob =>
+      jobs += (jobToSchedule.job.name -> jobToSchedule)
 
     case UnscheduleJob(jobName) =>
-      val actorRef: ActorRef = jobRunners(jobName)
-      router = router.removeRoutee(actorRef)
-      context.stop(actorRef)
-      jobRunners.remove(jobName)
+      jobs -= jobName
   }
 }
-
-class TriggerJobRunnerActor(cronExpression: CronExpression, job: Job) extends Actor with SimpleSchedulerExecutionContext {
-
-  import ThreadPoolContext._
-
-  val jobRunner: ActorRef = context.actorOf(Props[JobRunnerActor])
-  val scheduler: Scheduler = context.system.scheduler
-
-  def receive: Receive = {
-    case tick: DateTime if cronExpression.at(tick) =>
-      context.become(ignore)
-      jobRunner ! (tick -> job)
-      scheduler.scheduleOnce(SimpleScheduler.tickInterval + 100 milliseconds) {
-        self ! "unbecome"
-      }
-  }
-
-  def ignore: Receive = {
-    case "unbecome" => context.unbecome
-    case _ =>
-  }
-
-
-  override def postStop(): Unit = {
-    context.stop(jobRunner)
-    super.postStop()
-  }
-}
-
-class JobRunnerActor extends Actor {
-  val logger: DiagnosticLoggingAdapter = Logging.getLogger(this)
-
-  override def receive: Receive = {
-    case (dateTime: DateTime, job: Job) =>
-      logger.info(s"Running Job: '${job.name}' at: $dateTime")
-      try {
-        job.runnable.run()
-      } catch {
-        case t: Throwable => logger.error(t, t.getMessage)
-      }
-  }
-}
-
-
-case class Tick(tick: Long)
-
-
-case class Job(name: String, runnable: Runnable)
-
-case class ScheduleJob(job: Job, cronExpression: CronExpression)
-
-case class UnscheduleJob(jobName: String)
-
-case object Start
-
-case object Stop

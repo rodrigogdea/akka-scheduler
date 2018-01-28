@@ -71,23 +71,20 @@ case class CronExpression(expression: String) {
 
   import CronExpression._
 
-  private val matcher = parse(expression)
+  private val matcher = {
+    val position: Map[Int, String] = expression.trim.split(" ").zipWithIndex.map(_.swap).toMap
+    List[Function[DateTime, Boolean]](
+      CronItem(toCronValues(position(0), 0, 59), dt => dt.getSecondOfMinute),
+      CronItem(toCronValues(position(1), 0, 59), dt => dt.getMinuteOfHour),
+      CronItem(toCronValues(position(2), 0, 23), dt => dt.getHourOfDay),
+      CronItem(toCronValues(position(3), 1, 31), dt => dt.getDayOfMonth),
+      CronItem(toCronValues(position(4), 1, 7), dt => dt.getDayOfWeek),
+      CronItem(toCronValues(position(5), 1, 12), dt => dt.getMonthOfYear),
+      CronItem(toCronValues(position(6), 1), dt => dt.getYear)
+    ).reduce((mL, mR) => dt => mL(dt) && mR(dt))
+  }
 
   def at(dateTime: DateTime): Boolean = matcher(dateTime)
-
-  private def parse(expression: String): Function[DateTime, Boolean] = {
-    val intToString: Map[Int, String] = expression.trim.split(" ").zipWithIndex.map(_.swap).toMap
-    List[Function[DateTime, Boolean]](
-      CronItem(toCronValues(intToString(0), 0, 59), dt => dt.getSecondOfMinute),
-      CronItem(toCronValues(intToString(1), 0, 59), dt => dt.getMinuteOfHour),
-      CronItem(toCronValues(intToString(2), 0, 23), dt => dt.getHourOfDay),
-      CronItem(toCronValues(intToString(3), 1, 31), dt => dt.getDayOfMonth),
-      CronItem(toCronValues(intToString(4), 1, 7), dt => dt.getDayOfWeek),
-      CronItem(toCronValues(intToString(5), 1, 12), dt => dt.getMonthOfYear),
-      CronItem(toCronValues(intToString(6), 1), dt => dt.getYear)
-    )
-      .reduce((mL, mR) => dt => mL(dt) && mR(dt))
-  }
 
   private def toCronValues(cronItemExp: String,
                            minValue: Int,
@@ -96,7 +93,7 @@ case class CronExpression(expression: String) {
       case "*" => RangeCronValues(Range.inclusive(minValue, maxValue))
       case startWithStep(start, step) =>
         ListCronValues(Range.inclusive(start.toInt, start.toInt + maxValue, step.toInt)
-          .toList.map(_ % (maxValue +1)))
+          .toList.map(_ % (maxValue + 1)))
       case listOfValues(first, "", _) => ListCronValues(List(first.toInt))
       case listOfValues(first, more, _) => ListCronValues((first + more).split(",").map(_.toInt).toList)
       case rangeWithStep(min, max, null, null) => RangeCronValues(Range.inclusive(min.toInt, max.toInt))
@@ -105,9 +102,8 @@ case class CronExpression(expression: String) {
     }
   }
 
-  case class CronItem(cronValues: CronValues, instant: DateTime => Int)
-    extends Function[DateTime, Boolean] {
-    def apply(v1: DateTime): Boolean = cronValues.contains(instant(v1))
+  case class CronItem(cronValues: CronValues, instant: DateTime => Int) extends Function[DateTime, Boolean] {
+    def apply(time: DateTime): Boolean = cronValues.contains(instant(time))
   }
 
   trait CronValues {
