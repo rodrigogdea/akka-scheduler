@@ -1,6 +1,6 @@
 import org.joda.time.DateTime
-import org.rgdea.SimpleScheduler.Job
-import org.rgdea.{CronExpression, SimpleScheduler}
+import org.scheduler.SimpleScheduler.Job
+import org.scheduler.{CronExpression, SimpleScheduler}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.collection.mutable

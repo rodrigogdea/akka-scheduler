@@ -1,4 +1,4 @@
-package org.rgdea
+package org.scheduler
 
 import org.joda.time.DateTime
 

@@ -1,11 +1,11 @@
-package org.rgdea
+package org.scheduler
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, Props}
 import akka.event.Logging
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer}
 import org.joda.time.DateTime
-import org.rgdea.SimpleScheduler.{ScheduleJob, Start, Stop, Tick, UnscheduleJob}
+import org.scheduler.SimpleScheduler.{ScheduleJob, Start, Stop, Tick, UnscheduleJob}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

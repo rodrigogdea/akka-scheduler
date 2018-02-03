@@ -1,5 +1,5 @@
 import org.joda.time.DateTime
-import org.rgdea.CronExpression
+import org.scheduler.CronExpression
 import org.scalatest.{FlatSpec, Matchers}
 
 class CronExpressionSpec extends FlatSpec with Matchers {
